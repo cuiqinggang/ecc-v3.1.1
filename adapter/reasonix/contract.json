@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0.0",
+  "adapter": "ecc-v3.1-production",
+  "kind": "reasonix-shadow-adapter",
+  "skill": {
+    "name": "ecc-v3.1-production",
+    "runAs": "inline",
+    "location": "adapter/reasonix/SKILL.md",
+    "install_note": "正式接入 = 将 adapter/reasonix 目录整体复制为 <workspace>\\.reasonix\\skills\\ecc-v3.1-production；回滚 = 删除该目录（详见 references/rollback-plan.md）"
+  },
+  "entrypoints": {
+    "python": "adapter/reasonix/scripts/ecc31_smoke.py",
+    "powershell": "adapter/reasonix/scripts/ecc31_smoke.ps1"
+  },
+  "input": {
+    "type": "object",
+    "properties": {
+      "test_root": {
+        "type": "string",
+        "description": "可选：测试目录；默认 <v3.1>/tests，隔离副本验证时指向临时测试目录"
+      },
+      "timeout": {
+        "type": "number",
+        "description": "可选：测试套件超时秒数；默认 300"
+      }
+    },
+    "required": []
+  },
+  "output": {
+    "type": "object",
+    "properties": {
+      "status": {
+        "type": "string",
+        "enum": ["ECC_ACCEPTED", "ECC_PARTIAL", "ECC_BLOCKED", "ECC_REJECTED"]
+      },
+      "tests_run": { "type": "integer" },
+      "failures": { "type": "integer", "description": "failures + errors 合计" },
+      "skipped": { "type": "integer" },
+      "duration": { "type": "number", "description": "墙钟秒数" }
+    },
+    "required": ["status", "tests_run", "failures", "skipped", "duration"]
+  },
+  "four_state_semantics": {
+    "ECC_ACCEPTED": "tests_run > 0 且 failures == 0（全套测试全绿）",
+    "ECC_PARTIAL": "0 < failures < tests_run（部分失败）",
+    "ECC_BLOCKED": "tests_run > 0 且 failures >= tests_run（全部失败）",
+    "ECC_REJECTED": "运行器无法完成：测试目录缺失 / 解释器不可用 / 超时 / 解析不到 Ran N tests 结果行（fail closed）"
+  },
+  "errors": {
+    "AdapterStartupError": "进程启动或执行失败（测试目录不存在 / 解释器不可用 / 超时 / 无有效测试输出）；stderr 报诊断，exit 3，ECC 侧 fail closed",
+    "AdapterLoadError": "SKILL.md 加载失败（frontmatter 缺失 / 闭合缺失 / YAML 非法 / 必填字段缺失 / runAs 非法）；加载器抛错，ECC 侧 fail closed"
+  },
+  "exit_codes": {
+    "ECC_ACCEPTED": 0,
+    "ECC_PARTIAL": 1,
+    "ECC_BLOCKED": 2,
+    "ECC_REJECTED": 3
+  },
+  "timeouts": {
+    "test_suite_seconds": 300
+  },
+  "path_rule": "适配器文件内禁止出现带盘符的绝对路径字面量（代码注释中的说明除外）；定位一律基于 __file__ 相对路径"
+}
